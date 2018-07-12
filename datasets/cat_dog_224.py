@@ -37,6 +37,6 @@ def inputs(train_path, val_path, data_set,batch_size,num_epochs):
         ll = tf.expand_dims(labels, 1)
         indices = tf.expand_dims(tf.range(0, batch_size, 1), 1)
         concated = tf.concat([indices, ll], 1)
-        onehot_labels = tf.sparse_to_dense(concated, tf.stack([batch_size, 17]), 1.0, 0.0)
+        onehot_labels = tf.sparse_to_dense(concated, tf.stack([batch_size, 2]), 1.0, 0.0)
 
     return images, onehot_labels, labels

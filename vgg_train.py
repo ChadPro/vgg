@@ -9,23 +9,27 @@ from datasets import datasets_factory
 ################
 # Train param  #
 ################
+# Default param
 IMAGE_SIZE = 224
 REGULARIZATION_RATE = 0.0001
 MOVING_AVERAGE_DECAY = 0.99
+# Adjust params
 tf.app.flags.DEFINE_string('net_chose', 'vgg11_net_224', 'Chose which net.')
 tf.app.flags.DEFINE_float('learning_rate_base', 0.01, 'Initial learning base rate.')
 tf.app.flags.DEFINE_float('learning_rate_decay', 0.99, 'Learning rate decay.' )
 tf.app.flags.DEFINE_integer('learning_decay_step', 500, 'Learning rate decay step.')
 tf.app.flags.DEFINE_integer('total_steps', 300000, 'Total train steps.')
 tf.app.flags.DEFINE_integer('batch_size', 32, 'Data batch size.')
+tf.app.flags.DEFINE_float('gpu_fraction', 0.7, 'How to use gpu.')
 tf.app.flags.DEFINE_integer('num_classes', 1000, 'Classes num.')
+tf.app.flags.DEFINE_bool('fine_tune', False, 'Is fine_tune work.')
 
 tf.app.flags.DEFINE_string('log_dir', './board_log', 'Log file saved.')
 tf.app.flags.DEFINE_string('dataset', 'imagenet_224', 'Chose dataset in dataset_factory.')
 tf.app.flags.DEFINE_string('train_data_path', '', 'Dataset path for train.')
 tf.app.flags.DEFINE_string('val_data_path', '', 'Dataset path for val.')
 tf.app.flags.DEFINE_string('train_model_dir', './model/model.ckpt', 'Directory where checkpoints are written to.')
-
+tf.app.flags.DEFINE_string('restore_model_dir', '', 'Restore model.')
 FLAGS = tf.app.flags.FLAGS
 
 def train():
@@ -38,8 +42,8 @@ def train():
 
     #2. Forward propagation
     regularizer = tf.contrib.layers.l2_regularizer(REGULARIZATION_RATE)
-    y = vgg_net.vgg_net(x, num_classes=FLAGS.num_classes, is_training=isTrainNow, train='train', \
-                        regularizer=regularizer)
+    y, restore_var_list = vgg_net.vgg_net(x, num_classes=FLAGS.num_classes, is_training=isTrainNow, train='train', \
+                        fine_tune=FLAGS.fine_tune, regularizer=regularizer)
     output_y = tf.argmax(y, 1)
     global_step = tf.Variable(0, trainable=False)
     
@@ -62,7 +66,7 @@ def train():
     tf.summary.scalar('val_acc', accuracy)
     merged = tf.summary.merge_all()
     writer = tf.summary.FileWriter(FLAGS.log_dir, tf.get_default_graph())
-    model_saver = tf.train.Saver()
+    model_saver = tf.train.Saver(restore_var_list)
 
     #7. Get Dataset
     vgg_dataset = datasets_factory.get_dataset(FLAGS.dataset)
@@ -79,11 +83,17 @@ def train():
 
     #8. Start Train Session
     init_variables = tf.global_variables_initializer()
-    with tf.Session() as sess:
+    config = tf.ConfigProto(allow_soft_placement=True)
+    config.gpu_options.per_process_gpu_memory_fraction = FLAGS.gpu_fraction
+    with tf.Session(config=config) as sess:
         sess.run(init_variables)
         coord = tf.train.Coordinator()
         threads = tf.train.start_queue_runners(sess=sess, coord=coord)
         startTime = time.time()
+
+        if len(FLAGS.restore_model_dir) > 0:
+            print "#####=============> Restore Model : "+str(FLAGS.restore_model_dir)
+            model_saver.restore(sess, FLAGS.restore_model_dir)
 
         for i in range(FLAGS.total_steps):
             x_input, y_input = sess.run([input_X, input_Y])
@@ -101,6 +111,10 @@ def train():
                 run_time = time.time() - startTime
                 run_time = run_time / 60
 
+                work_type = 'train'
+                if FLAGS.fine_tune:
+                    work_type = 'fine tune'
+                print("########### " + work_type +" ###############")
                 print("############ step : %d ################"%step)
                 print("   learning_rate = %g                    "%learning_rate_now)
                 print("   lose(batch)   = %g                    "%loss_value)

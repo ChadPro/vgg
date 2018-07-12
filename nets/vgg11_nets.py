@@ -12,13 +12,13 @@ DEFAULT_OUTPUT_NODE = 1000
 BN_DECAY = 0.9
 ACTIVATION = tf.nn.relu
 
-def vgg_conv(net_input, filter_size, strides, padding, scope):
+def vgg_conv(net_input, filter_size, strides, padding, scope, trainable=True):
     with tf.variable_scope(scope):
-        conv_weights = tf.get_variable("weights", filter_size, initializer=tf.truncated_normal_initializer(stddev=STDDEV))
+        conv_weights = tf.get_variable("weights", filter_size, initializer=tf.truncated_normal_initializer(stddev=STDDEV), trainable=trainable)
         conv_biases = tf.get_variable("biases", filter_size[-1], initializer=tf.constant_initializer(0.0))
         net = tf.nn.conv2d(net_input, conv_weights, strides=strides, padding=padding)
         net = tf.nn.relu(tf.nn.bias_add(net, conv_biases))
-    return net
+    return net, conv_weights, conv_biases
 
 def vgg_max_pool(net_input, ksize, strides, padding, scope):
     with tf.name_scope(scope):
@@ -51,6 +51,7 @@ def vgg_net(inputs, \
             train="train", \
             regularizer=None, \
             reuse=None, \
+            fine_tune=False, \
             scope='vgg11_224'):
     # rgb --> bgr
     rgb_scaled = inputs
@@ -61,34 +62,54 @@ def vgg_net(inputs, \
     bgr = tf.concat(axis=3, values=[blue - IMAGENET_MEAN[0], green - IMAGENET_MEAN[1], red - IMAGENET_MEAN[2], ])
     assert bgr.get_shape().as_list()[1:] == [224, 224, 3]
 
-    nets_dict = {}
+    weights_trainable = True
+    if fine_tune:
+        weights_trainable = False
 
+    nets_dict = {}
+    variables_restore = []
     with tf.variable_scope(scope):
         with tf.variable_scope('part_1'):
-            net = vgg_conv(bgr, filter_size=[3,3,3,64], strides=[1,1,1,1], padding='SAME', scope='conv_1')
+            net, w1_1, b1_1 = vgg_conv(bgr, filter_size=[3,3,3,64], strides=[1,1,1,1], padding='SAME', scope='conv_1', trainable=weights_trainable)
+            variables_restore.append(w1_1)
+            variables_restore.append(b1_1)
 
         net = vgg_max_pool(net, ksize=[1,2,2,1], strides=[1,2,2,1], padding='SAME', scope='max_pool_1')
 
         with tf.variable_scope('part_2'):
-            net = vgg_conv(net, filter_size=[3,3,64,128], strides=[1,1,1,1], padding='SAME', scope='conv_1')
+            net, w2_1, b2_1 = vgg_conv(net, filter_size=[3,3,64,128], strides=[1,1,1,1], padding='SAME', scope='conv_1', trainable=weights_trainable)
+            variables_restore.append(w2_1)
+            variables_restore.append(b2_1)
 
         net = vgg_max_pool(net, ksize=[1,2,2,1], strides=[1,2,2,1], padding='SAME', scope='max_pool_2')
 
         with tf.variable_scope('part_3'):
-            net = vgg_conv(net, filter_size=[3,3,128,256], strides=[1,1,1,1], padding='SAME', scope='conv_1')
-            net = vgg_conv(net, filter_size=[3,3,256,256], strides=[1,1,1,1], padding='SAME', scope='conv_2')
+            net, w3_1, b3_1 = vgg_conv(net, filter_size=[3,3,128,256], strides=[1,1,1,1], padding='SAME', scope='conv_1', trainable=weights_trainable)
+            net, w3_2, b3_2 = vgg_conv(net, filter_size=[3,3,256,256], strides=[1,1,1,1], padding='SAME', scope='conv_2', trainable=weights_trainable)
+            variables_restore.append(w3_1)
+            variables_restore.append(b3_1)
+            variables_restore.append(w3_2)
+            variables_restore.append(b3_2)
 
         net = vgg_max_pool(net, ksize=[1,2,2,1], strides=[1,2,2,1], padding='SAME', scope='max_pool_3')
 
         with tf.variable_scope('part_4'):
-            net = vgg_conv(net, filter_size=[3,3,256,512], strides=[1,1,1,1], padding='SAME', scope='conv_1')
-            net = vgg_conv(net, filter_size=[3,3,512,512], strides=[1,1,1,1], padding='SAME', scope='conv_2')
+            net, w4_1, b4_1 = vgg_conv(net, filter_size=[3,3,256,512], strides=[1,1,1,1], padding='SAME', scope='conv_1', trainable=weights_trainable)
+            net, w4_2, b4_2 = vgg_conv(net, filter_size=[3,3,512,512], strides=[1,1,1,1], padding='SAME', scope='conv_2', trainable=weights_trainable)
+            variables_restore.append(w4_1)
+            variables_restore.append(b4_1)
+            variables_restore.append(w4_2)
+            variables_restore.append(b4_2)
 
         net = vgg_max_pool(net, ksize=[1,2,2,1], strides=[1,2,2,1], padding='SAME', scope='max_pool_4')
 
         with tf.variable_scope('part_5'):
-            net = vgg_conv(net, filter_size=[3,3,512,512], strides=[1,1,1,1], padding='SAME', scope='conv_1')
-            net = vgg_conv(net, filter_size=[3,3,512,512], strides=[1,1,1,1], padding='SAME', scope='conv_2')
+            net, w5_1, b5_1 = vgg_conv(net, filter_size=[3,3,512,512], strides=[1,1,1,1], padding='SAME', scope='conv_1', trainable=weights_trainable)
+            net, w5_2, b5_2 = vgg_conv(net, filter_size=[3,3,512,512], strides=[1,1,1,1], padding='SAME', scope='conv_2', trainable=weights_trainable)
+            variables_restore.append(w5_1)
+            variables_restore.append(b5_1)
+            variables_restore.append(w5_2)
+            variables_restore.append(b5_2)
 
         net = vgg_max_pool(net, ksize=[1,2,2,1], strides=[1,2,2,1], padding='SAME', scope='max_pool_5')
 
@@ -101,4 +122,4 @@ def vgg_net(inputs, \
             net = vgg_fc(net, fc_size=[4096,4096], train=train, regularizer=regularizer, scope="fc_2")
             logit = vgg_logit(net, fc_size=[4096,num_classes], regularizer=regularizer, scope="fc_3")
 
-    return logit
+    return logit, variables_restore
