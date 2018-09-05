@@ -1,10 +1,15 @@
 # -- coding: utf-8 --
+# Copyright 2018 The LongYan. All Rights Reserved.
+
+from __future__ import absolute_import
+from __future__ import division
 
 import tensorflow as tf
 import numpy as np
 import time
 from nets import nets_factory
 from datasets import datasets_factory
+from tf_extend import vgg_acc
 
 ################
 # Train param  #
@@ -59,7 +64,7 @@ def train():
     #5. Calculate val accuracy
     correct_prediction = tf.equal(tf.argmax(y, 1), tf.argmax(y_, 1))
     accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
-
+    
     #6. Tensorboard summary and Saver persistent
     tf.summary.scalar('total_loss', total_loss)
     tf.summary.scalar('learning_rate', learning_rate)
@@ -94,6 +99,8 @@ def train():
         if len(FLAGS.restore_model_dir) > 0:
             print "#####=============> Restore Model : "+str(FLAGS.restore_model_dir)
             model_saver.restore(sess, FLAGS.restore_model_dir)
+        else:
+            print "#####=============> Create Model : "+str(FLAGS.train_model_dir)
 
         for i in range(FLAGS.total_steps):
             x_input, y_input = sess.run([input_X, input_Y])
@@ -102,11 +109,8 @@ def train():
             if i % 30 == 0:
                 learning_rate_now = FLAGS.learning_rate_base * (FLAGS.learning_rate_decay**(step / FLAGS.learning_decay_step))
                 x_input_val, y_input_val = sess.run([input_X_val, input_Y_val])
-                summary_str, result, outy, outy_ = sess.run([merged, accuracy, output_y, label_y_], feed_dict={x:x_input_val, y_:y_input_val, isTrainNow:False})
+                summary_str, result, outy, outy_ = sess.run([merged, accuracy, y, y_], feed_dict={x:x_input_val, y_:y_input_val, isTrainNow:False})
                 writer.add_summary(summary_str, i)
-
-                acc = result * 100.0
-                accStr = str(acc) + "%"
 
                 run_time = time.time() - startTime
                 run_time = run_time / 60
@@ -118,10 +122,9 @@ def train():
                 print("############ step : %d ################"%step)
                 print("   learning_rate = %g                    "%learning_rate_now)
                 print("   lose(batch)   = %g                    "%loss_value)
-                print("   accuracy      = " + accStr)
+                print("   acc(batch) top1      = " + vgg_acc.acc_top1(outy, outy_))
+                print("   acc(batch) top5      = " + vgg_acc.acc_top5(outy, outy_))
                 print("   train run     = %d min"%run_time)
-                print" output : ", outy[0:10]
-                print" label : ", outy_[0:10]
                 print(" ")
                 print(" ")
 

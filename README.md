@@ -38,6 +38,15 @@ num_classes:是分类数目
 ```
 python vgg_train.py --dataset='flowers17_224' --train_data_path='train.tfrecord' --val_data_path='val.tfrecord' --num_classes=17
 ```
+训练开始后，你能看到网络情况log：  
+>########### train ###############
+############ step : 2941 ################
+   learning_rate = 0.00942597                    
+   lose(batch)   = 0.541191                    
+   acc top1      = 65.625%
+   acc top5      = 93.75%
+   train run     = 9 min
+
 
 2. train for cat&dog  
 

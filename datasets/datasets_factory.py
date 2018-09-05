@@ -1,6 +1,5 @@
 from __future__ import absolute_import
 from __future__ import division
-from __future__ import print_function
 
 from datasets import imagenet_224
 from datasets import flowers17_224
