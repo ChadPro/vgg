@@ -1,5 +1,11 @@
 # Very Deep Convolutional Networks For Large-Scale Image Recognition
 vgg网络研究了卷积网络深度在大规模的图像识别环境下对准确性的影响，在网络中使用的是非常小的 3*3 卷积滤波器.本仓库是对论文中网络的代码实现,使用框架为 Tensorflow,数据格式为 TFRecord.
+# Environment
+Cuda 9.0  
+Cudnn 7.4  
+python 3.5  
+Tensorflow 1.12.0  
+
 # Content
 1. VGG网络结构图
 2. 仓库文件解析
